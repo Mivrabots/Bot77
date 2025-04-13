@@ -28,6 +28,17 @@ AUTHORIZED_USER_IDS = [
 async def on_ready():
     print(f'✅ Bot connected as {bot.user}')
 
+
+@bot.command()
+async def stop(ctx):
+    if ctx.author.id not in AUTHORIZED_USER_IDS:
+        await ctx.send("❌ You are not authorized to use this command.")
+        return
+
+    await ctx.send("🛑 Shutting down the bot...")
+    print("🛑 Bot is shutting down...")
+    await bot.close()
+
 @bot.command()
 async def Hi(ctx):
     if ctx.author.id not in AUTHORIZED_USER_IDS:

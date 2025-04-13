@@ -13,7 +13,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 intents = discord.Intents.all()
 intents.members = True
 bot = commands.Bot(command_prefix='.', intents=intents)
-Token = os.environ.get("TOKEN")
+Token = os.environ.get("Token")
 
 # Replace with your authorized user IDs (up to 5)
 AUTHORIZED_USER_IDS = [
@@ -113,4 +113,4 @@ async def delete_role(role):
         print(f'❌ Error deleting role {role.name}: {e}')
 
 
-bot.run(TOKEN)
+bot.run(Token)

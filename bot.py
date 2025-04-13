@@ -40,7 +40,7 @@ async def stop(ctx):
         await ctx.send("❌ You are not authorized to use this command.")
         return
 
-    stop_requested = True
+    stop_requested = False
     await ctx.send("🛑 Stop signal received. Attempting to halt operations.")
     print("🛑 Stop signal received.")
 

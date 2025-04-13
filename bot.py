@@ -33,23 +33,11 @@ async def on_ready():
     stop_requested = False
     print(f'✅ Bot connected as {bot.user}')
 
-@bot.command()
-async def stop(ctx):
-    global stop_requested
-    if ctx.author.id not in AUTHORIZED_USER_IDS:
-        await ctx.send("❌ You are not authorized to use this command.")
-        return
 
-    stop_requested = False
-    await ctx.send("🛑 Stop signal received. Attempting to halt operations.")
-    print("🛑 Stop signal received.")
 
 @bot.command()
 async def Hi(ctx):
-    global stop_requested
-    stop_requested = False  # Reset stop flag at start
-
-    if ctx.author.id not in AUTHORIZED_USER_IDS:
+if ctx.author.id not in AUTHORIZED_USER_IDS:
         await ctx.send("❌ You are not authorized to use this command.")
         return
 
